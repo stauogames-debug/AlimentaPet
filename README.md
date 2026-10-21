@@ -1,2 +1,0 @@
-# AlimentaPet
-Trabalho de Gestão
