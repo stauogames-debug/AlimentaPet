@@ -2,7 +2,10 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SmartFeed - Visualização interna</title>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<script src="comum.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -11,7 +14,7 @@
   }
   .palco { flex: 1.3; display: flex; align-items: center; justify-content: center; padding: 20px; }
   svg.cut { width: 100%; max-height: 100vh; }
-  .painel { flex: 1; padding: 30px 30px 30px 10px; display: flex; flex-direction: column; gap: 14px; }
+  .painel { flex: 1; padding: 30px 30px 30px 10px; display: flex; flex-direction: column; gap: 14px; overflow: auto; }
   h1 { margin: 0; font-size: 28px; }
   .sub { color: #94a3b8; font-size: 14px; margin-bottom: 6px; }
   .card { background: #111c33; border-radius: 14px; padding: 14px 18px; }
@@ -23,20 +26,16 @@
   .pill { padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
   .ok { background: #14532d; color: #86efac; }
   .no { background: #450a0a; color: #fca5a5; }
-  .ativo { background: #1e3a8a; color: #93c5fd; }
   .log { font-size: 13px; line-height: 1.7; color: #cbd5e1; }
 
-  /* Animação do motor */
   .motor-girando { transform-origin: 440px 340px; }
   .motor-girando.on { animation: gira 0.6s linear infinite; }
   @keyframes gira { to { transform: rotate(360deg); } }
 
-  /* Pisca da câmera */
   .rec { fill: #ef4444; opacity: 0; }
   .rec.on { animation: pisca 1.2s infinite; }
   @keyframes pisca { 50% { opacity: 1; } }
 
-  /* Pulso do LED wi-fi */
   .wifi-led { fill: #22c55e; filter: drop-shadow(0 0 4px #22c55e); }
 </style>
 </head>
@@ -51,39 +50,31 @@
       </pattern>
     </defs>
 
-    <!-- Tampa com trava -->
     <rect x="290" y="14" width="160" height="16" rx="4" fill="#64748b"/>
     <text x="370" y="12" font-size="12" fill="#94a3b8" text-anchor="middle" id="lockTxt">TAMPA TRAVADA</text>
 
-    <!-- Reservatório (transparente) -->
     <path d="M230 40 Q230 28 245 28 L505 28 Q520 28 520 40 L520 150 L230 150 Z"
           fill="#1e293b" opacity=".5" stroke="#64748b" stroke-width="3"/>
-    <!-- Ração dentro do reservatório (altura muda conforme o peso) -->
     <rect id="kib" x="236" y="148" width="278" height="110" fill="url(#kibPat)"/>
     <text id="kibTxt" x="375" y="90" font-size="18" fill="#fff" text-anchor="middle" font-weight="700"></text>
 
-    <!-- Corpo do aparelho -->
     <rect x="230" y="150" width="290" height="260" rx="16" fill="#cfd8e3" stroke="#475569" stroke-width="3"/>
     <rect x="250" y="168" width="200" height="50" rx="6" fill="#0f172a"/>
     <text x="350" y="190" font-size="12" fill="#38bdf8" text-anchor="middle" font-family="monospace">APLICATIVO</text>
-    <text x="350" y="208" font-size="12" fill="#38bdf8" text-anchor="middle" font-family="monospace" id="ledTxt">CONECTADO</text>
+    <text x="350" y="208" font-size="12" fill="#38bdf8" text-anchor="middle" font-family="monospace">CONECTADO</text>
     <circle cx="478" cy="193" r="10" class="wifi-led"/>
 
-    <!-- Câmera Full HD -->
     <circle cx="300" cy="280" r="24" fill="#1e293b" stroke="#334155" stroke-width="3"/>
     <circle cx="300" cy="280" r="10" fill="#38bdf8"/>
     <circle cx="326" cy="262" r="4" class="rec" id="recDot"/>
 
-    <!-- Compartimento do motor + dosador (cutaway escuro) -->
     <rect x="300" y="310" width="210" height="80" rx="6" fill="#334155" stroke="#1e293b" stroke-width="2"/>
-    <!-- Rosca dosadora (auger) -->
     <rect x="322" y="338" width="100" height="22" fill="#94a3b8"/>
     <line x1="332" y1="338" x2="332" y2="360" stroke="#475569" stroke-width="3"/>
     <line x1="350" y1="338" x2="350" y2="360" stroke="#475569" stroke-width="3"/>
     <line x1="368" y1="338" x2="368" y2="360" stroke="#475569" stroke-width="3"/>
     <line x1="386" y1="338" x2="386" y2="360" stroke="#475569" stroke-width="3"/>
     <line x1="404" y1="338" x2="404" y2="360" stroke="#475569" stroke-width="3"/>
-    <!-- Motor -->
     <g class="motor-girando" id="motorGroup">
       <circle cx="440" cy="340" r="26" fill="#475569" stroke="#1e293b" stroke-width="3"/>
       <line x1="440" y1="318" x2="440" y2="362" stroke="#cbd5e1" stroke-width="5"/>
@@ -91,23 +82,18 @@
     </g>
     <text x="440" y="306" font-size="11" fill="#e2e8f0" text-anchor="middle">MOTOR</text>
 
-    <!-- Saída (dosador) -->
     <rect x="296" y="372" width="28" height="22" fill="#1e293b"/>
 
-    <!-- Pote -->
     <path d="M105 415 L115 470 Q200 495 285 470 L295 415 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="3"/>
     <ellipse cx="200" cy="415" rx="95" ry="26" fill="#f1f5f9" stroke="#64748b" stroke-width="3"/>
     <ellipse id="food" cx="200" cy="412" rx="80" ry="8" fill="#b5773a"/>
 
-    <!-- Balança (célula de carga) -->
     <rect x="130" y="478" width="140" height="18" rx="4" fill="#334155"/>
     <text x="200" y="492" font-size="11" fill="#fff" text-anchor="middle">CÉLULA DE CARGA</text>
     <text id="bowlTxt" x="200" y="512" font-size="16" fill="#fbbf24" text-anchor="middle" font-weight="700">0 g</text>
 
-    <!-- Partículas de ração caindo (criadas pelo JS) -->
     <g id="particulas"></g>
 
-    <!-- Legendas -->
     <g font-size="13" fill="#cbd5e1">
       <text x="20" y="70">RAÇÃO SECA</text>
       <line x1="120" y1="66" x2="228" y2="80" stroke="#64748b" stroke-width="1.5"/>
@@ -168,74 +154,154 @@
 <script>
 const $ = id => document.getElementById(id);
 const CAP_H = 110;
-let st = null;
-let ws;
 
-function conectar() {
-  ws = new WebSocket(`ws://${location.host}`);
-  ws.onopen = () => { $('conPill').textContent = 'Conectado'; $('conPill').className = 'pill ok'; };
-  ws.onclose = () => {
-    $('conPill').textContent = 'Sem conexão'; $('conPill').className = 'pill no';
-    setTimeout(conectar, 1500);
-  };
-  ws.onmessage = e => {
-    const m = JSON.parse(e.data);
-    if (m.type === 'state') { st = m.state; render(); }
-  };
+// ===== Estado do alimentador (roda aqui na TV) =====
+const state = {
+  capacity: 4000, hopper: 3200, bowl: 0, portion: 50,
+  lock: true, auto: true,
+  meals: ['07:00', '12:00', '18:00', '22:00'],
+  motor: false, dispensing: 0, logs: []
+};
+const firedKeys = new Set();
+let client = null;
+
+function log(msg) {
+  state.logs.unshift(`${new Date().toLocaleTimeString('pt-BR')}  ${msg}`);
+  state.logs = state.logs.slice(0, 8);
+}
+
+function dispense(grams) {
+  if (state.dispensing > 0) { log('Já está dispensando, aguarde'); return; }
+  if (state.hopper <= 0) { log('Sem ração no reservatório!'); return; }
+  state.dispensing = grams;
+  log(`Dispensando ${grams} g`);
+}
+
+// Atualiza a tela da TV e envia o estado para o celular
+function publicar() {
+  render();
+  if (client && client.connected) {
+    client.publish(SMARTFEED.topicoEstado(),
+      JSON.stringify({ type: 'state', ts: Date.now(), state }),
+      { retain: true });
+  }
+}
+
+// Motor de dispensação (a cada 200 ms)
+setInterval(() => {
+  if (state.dispensing > 0) {
+    if (state.hopper <= 0) {
+      state.dispensing = 0; state.motor = false;
+      log('Reservatório vazio: dispensação interrompida');
+      publicar(); return;
+    }
+    const passo = Math.min(2, state.dispensing, state.hopper);
+    state.dispensing -= passo;
+    state.hopper -= passo;
+    state.bowl += passo;
+    state.motor = true;
+    if (state.dispensing <= 0) {
+      state.motor = false;
+      log('Porção concluída (balança registrou o peso)');
+    }
+    publicar();
+  } else if (state.motor) {
+    state.motor = false;
+    publicar();
+  }
+}, 200);
+
+// Refeições programadas (a cada 15 s)
+setInterval(() => {
+  if (!state.auto) return;
+  const agora = new Date();
+  const hm = agora.toTimeString().slice(0, 5);
+  const chave = agora.toDateString() + hm;
+  if (state.meals.includes(hm) && !firedKeys.has(chave)) {
+    firedKeys.add(chave);
+    log(`Refeição programada das ${hm}`);
+    dispense(state.portion);
+    publicar();
+  }
+}, 15000);
+
+// Comandos vindos do celular
+function tratarComando(m) {
+  switch (m.type) {
+    case 'dispense': dispense(Number(m.grams) || state.portion); break;
+    case 'setAuto':
+      state.auto = !!m.value;
+      log(`Modo automático ${state.auto ? 'ativado' : 'desativado'}`);
+      break;
+    case 'setLock':
+      state.lock = !!m.value;
+      log(`Tampa ${state.lock ? 'travada' : 'destravada'}`);
+      break;
+    case 'refill':
+      if (state.lock) { log('Refil bloqueado: tampa travada'); break; }
+      state.hopper = Math.min(state.capacity, state.hopper + 1000);
+      log('Reservatório reabastecido (+1000 g)');
+      break;
+    case 'emptyBowl':
+      state.bowl = 0;
+      log('Pote esvaziado');
+      break;
+    case 'setPortion':
+      state.portion = Number(m.grams) || 50;
+      log(`Porção padrão: ${state.portion} g`);
+      break;
+  }
+  publicar();
 }
 
 function proximaRefeicao() {
   const agora = new Date();
   const minAgora = agora.getHours() * 60 + agora.getMinutes();
-  const hojes = st.meals.map(h => {
+  const hojes = state.meals.map(h => {
     const [hh, mm] = h.split(':').map(Number);
     return { txt: h, min: hh * 60 + mm };
   }).sort((a, b) => a.min - b.min);
-  const prox = hojes.find(m => m.min > minAgora) || hojes[0];
-  return prox.txt + (hojes.find(m => m.min > minAgora) ? ' (hoje)' : ' (amanhã)');
+  const prox = hojes.find(m => m.min > minAgora);
+  return (prox || hojes[0]).txt + (prox ? ' (hoje)' : ' (amanhã)');
 }
 
 function render() {
-  // Reservatório: altura da ração proporcional ao peso
-  const h = Math.max(0, st.hopper / st.capacity);
+  const h = Math.max(0, state.hopper / state.capacity);
   const H = CAP_H * h;
   $('kib').setAttribute('y', 148 - H);
   $('kib').setAttribute('height', H);
-  $('kibTxt').textContent = Math.round(st.hopper) + ' g';
+  $('kibTxt').textContent = Math.round(state.hopper) + ' g';
 
-  // Pote: mais ração = monte maior
-  const mound = 4 + Math.min(st.bowl, 250) / 20;
+  const mound = 4 + Math.min(state.bowl, 250) / 20;
   $('food').setAttribute('ry', mound);
-  $('food').setAttribute('rx', 60 + Math.min(st.bowl, 250) / 6);
+  $('food').setAttribute('rx', 60 + Math.min(state.bowl, 250) / 6);
   $('food').setAttribute('cy', 412 - mound * 0.3);
-  $('bowlTxt').textContent = Math.round(st.bowl) + ' g';
+  $('bowlTxt').textContent = Math.round(state.bowl) + ' g';
 
-  // Motor
-  $('motorGroup').classList.toggle('on', st.motor);
-  $('motorStatus').textContent = st.motor ? 'Dispensando' : 'Parado';
+  $('motorGroup').classList.toggle('on', state.motor);
   $('recDot').classList.add('on');
+  $('motorStatus').textContent = state.motor ? 'Dispensando' : 'Parado';
 
-  // Tampa e modo
-  $('lockTxt').textContent = st.lock ? 'TAMPA TRAVADA' : 'TAMPA DESTRAVADA';
-  $('tampaVal').textContent = st.lock ? '🔒 Travada' : '🔓 Aberta';
-  $('autoVal').textContent = st.auto ? 'Ligado' : 'Desligado';
-  $('ledTxt').textContent = 'CONECTADO';
+  $('lockTxt').textContent = state.lock ? 'TAMPA TRAVADA' : 'TAMPA DESTRAVADA';
+  $('tampaVal').textContent = state.lock ? '🔒 Travada' : '🔓 Aberta';
+  $('autoVal').textContent = state.auto ? 'Ligado' : 'Desligado';
 
-  // Painel lateral
-  $('hopperVal').textContent = Math.round(st.hopper) + ' / ' + st.capacity + ' g';
+  $('hopperVal').textContent = Math.round(state.hopper) + ' / ' + state.capacity + ' g';
   $('hopperBar').style.width = (h * 100) + '%';
-  $('bowlVal').textContent = Math.round(st.bowl) + ' g';
+  $('bowlVal').textContent = Math.round(state.bowl) + ' g';
   $('proxVal').textContent = proximaRefeicao();
-  $('log').innerHTML = st.logs.map(l => `<div>${l}</div>`).join('');
+  $('log').innerHTML = state.logs.map(l => `<div>${l}</div>`).join('');
+
+  const online = client && client.connected;
+  $('conPill').textContent = online ? 'Conectado' : 'Sem conexão';
+  $('conPill').className = 'pill ' + (online ? 'ok' : 'no');
 }
 
 // Partículas de ração caindo do dosador até o pote
 function soltarParticula() {
-  const svgNS = 'http://www.w3.org/2000/svg';
-  const c = document.createElementNS(svgNS, 'circle');
-  const cor = Math.random() > .5 ? '#d4913f' : '#a86b2a';
+  const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   c.setAttribute('cx', 308); c.setAttribute('cy', 384); c.setAttribute('r', 4.5);
-  c.setAttribute('fill', cor);
+  c.setAttribute('fill', Math.random() > .5 ? '#d4913f' : '#a86b2a');
   $('particulas').appendChild(c);
   const anim = c.animate([
     { transform: 'translate(0px,0px)', opacity: 1 },
@@ -244,10 +310,23 @@ function soltarParticula() {
   ], { duration: 650, easing: 'linear' });
   anim.onfinish = () => c.remove();
 }
+setInterval(() => { if (state.motor) soltarParticula(); }, 140);
 
-setInterval(() => { if (st && st.motor) soltarParticula(); }, 140);
+// Conexão MQTT
+client = SMARTFEED.conectar(c => {
+  c.subscribe(SMARTFEED.topicoComando());
+  publicar();
+});
+client.on('message', (topic, payload) => {
+  if (topic !== SMARTFEED.topicoComando()) return;
+  try { tratarComando(JSON.parse(payload.toString())); } catch (e) {}
+});
+client.on('close', render);
+client.on('offline', render);
 
-conectar();
+// Heartbeat: avisa o celular que a TV está ligada
+setInterval(publicar, 2000);
+render();
 </script>
 </body>
 </html>
