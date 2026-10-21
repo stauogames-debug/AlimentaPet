@@ -1,6 +1,6 @@
 const SMARTFEED = {
   // TROQUE por um nome único, ex: 'smartfeed-stauo-x7k2m9'
-  sala: 'smartfeed-stauo-x7k2m9',
+  sala: 'smartfeed1234-4321',
   broker: 'wss://broker.hivemq.com:8884/mqtt',
 
   topicoEstado() { return this.sala + '/estado'; },
