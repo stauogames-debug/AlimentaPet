@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SmartFeed - Controle</title>
+<script src="https://unpkg.com/mqtt@4.3.7/dist/mqtt.min.js"></script>
+<script src="comum.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -12,9 +14,7 @@
   }
   h1 { font-size: 22px; margin: 4px 0 2px; }
   .sub { color: #94a3b8; font-size: 13px; margin-bottom: 16px; }
-  .card {
-    background: #1e293b; border-radius: 14px; padding: 14px; margin-bottom: 12px;
-  }
+  .card { background: #1e293b; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
   .status { display: flex; justify-content: space-between; align-items: center; }
   .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
   .on-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
@@ -29,8 +29,6 @@
   button.laranja { background: #ea580c; }
   button.roxo { background: #7c3aed; }
   button.cinza { background: #475569; }
-  button:disabled { opacity: .4; }
-  .big { grid-column: span 2; }
   .toggle { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
   .log { font-size: 12px; color: #94a3b8; line-height: 1.6; max-height: 150px; overflow: auto; }
   .porcao { display: flex; gap: 8px; margin-top: 8px; }
@@ -94,25 +92,37 @@
 
 <script>
 let state = { lock: true, auto: true, portion: 50, hopper: 0, bowl: 0, motor: false, logs: [] };
-let ws;
+let lastSeen = 0; // quando chegou o último estado da TV
 
-function conectar() {
-  ws = new WebSocket(`ws://${location.host}`);
-  ws.onopen = () => setConexao(true);
-  ws.onclose = () => { setConexao(false); setTimeout(conectar, 1500); };
-  ws.onmessage = e => {
-    const m = JSON.parse(e.data);
-    if (m.type === 'state') { state = m.state; render(); }
-  };
-}
+const client = SMARTFEED.conectar(c => {
+  c.subscribe(SMARTFEED.topicoEstado());
+  atualizarStatus();
+});
 
-function setConexao(ok) {
-  document.getElementById('conDot').className = 'dot ' + (ok ? 'on-dot' : 'off-dot');
-  document.getElementById('conTxt').textContent = ok ? 'Conectado ao SmartFeed' : 'Sem conexão';
+client.on('message', (topic, payload) => {
+  if (topic !== SMARTFEED.topicoEstado()) return;
+  const m = JSON.parse(payload.toString());
+  state = m.state;
+  lastSeen = Date.now();
+  render();
+});
+client.on('close', atualizarStatus);
+client.on('offline', atualizarStatus);
+setInterval(atualizarStatus, 1000);
+
+function tvOnline() { return Date.now() - lastSeen < 6000; }
+
+function atualizarStatus() {
+  const internet = client.connected;
+  const tv = internet && tvOnline();
+  document.getElementById('conDot').className = 'dot ' + (tv ? 'on-dot' : 'off-dot');
+  document.getElementById('conTxt').textContent =
+    !internet ? 'Sem internet' :
+    tvOnline() ? 'TV conectada' : 'TV desligada ou fora do ar';
 }
 
 function enviar(obj) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  if (client.connected) client.publish(SMARTFEED.topicoComando(), JSON.stringify(obj));
 }
 
 function servir(g) { enviar({ type: 'dispense', grams: g }); }
@@ -142,8 +152,6 @@ document.getElementById('btnLock').onclick = () => enviar({ type: 'setLock', val
 document.querySelectorAll('#porcoes button').forEach(b => {
   b.onclick = () => enviar({ type: 'setPortion', grams: Number(b.dataset.g) });
 });
-
-conectar();
 </script>
 </body>
 </html>
