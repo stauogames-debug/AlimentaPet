@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SmartFeed - Controle</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, sans-serif;
+    background: #0f172a; color: #e2e8f0; padding: 16px;
+  }
+  h1 { font-size: 22px; margin: 4px 0 2px; }
+  .sub { color: #94a3b8; font-size: 13px; margin-bottom: 16px; }
+  .card {
+    background: #1e293b; border-radius: 14px; padding: 14px; margin-bottom: 12px;
+  }
+  .status { display: flex; justify-content: space-between; align-items: center; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .on-dot { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+  .off-dot { background: #ef4444; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button {
+    border: none; border-radius: 12px; padding: 16px 10px; font-size: 15px;
+    font-weight: 600; color: #fff; background: #3b82f6; cursor: pointer;
+  }
+  button:active { transform: scale(0.97); }
+  button.verde { background: #16a34a; }
+  button.laranja { background: #ea580c; }
+  button.roxo { background: #7c3aed; }
+  button.cinza { background: #475569; }
+  button:disabled { opacity: .4; }
+  .big { grid-column: span 2; }
+  .toggle { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; }
+  .log { font-size: 12px; color: #94a3b8; line-height: 1.6; max-height: 150px; overflow: auto; }
+  .porcao { display: flex; gap: 8px; margin-top: 8px; }
+  .porcao button { flex: 1; padding: 10px; font-size: 14px; background: #334155; }
+  .porcao button.ativo { background: #3b82f6; }
+</style>
+</head>
+<body>
+
+<h1>SmartFeed</h1>
+<div class="sub">Controle do alimentador</div>
+
+<div class="card status">
+  <div><span class="dot off-dot" id="conDot"></span><span id="conTxt">Conectando...</span></div>
+  <div id="motorTxt">Motor parado</div>
+</div>
+
+<div class="card">
+  <div>Ração no reservatório: <b id="hopperTxt">--</b></div>
+  <div>No pote (balança): <b id="bowlTxt">--</b></div>
+</div>
+
+<div class="card">
+  <div class="toggle">
+    <span>Modo automático (4 refeições/dia)</span>
+    <button id="btnAuto" class="verde" style="padding:8px 14px">--</button>
+  </div>
+  <div class="toggle">
+    <span>Tampa com trava de segurança</span>
+    <button id="btnLock" class="cinza" style="padding:8px 14px">--</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="margin-bottom:8px">Servir agora:</div>
+  <div class="grid">
+    <button onclick="servir(20)">20 g</button>
+    <button onclick="servir(50)">50 g</button>
+    <button onclick="servir(100)">100 g</button>
+    <button class="verde" onclick="servir(state.portion)">Porção padrão</button>
+  </div>
+  <div style="margin-top:10px;font-size:13px;color:#94a3b8">Porção padrão da programação:</div>
+  <div class="porcao" id="porcoes">
+    <button data-g="30">30 g</button>
+    <button data-g="50">50 g</button>
+    <button data-g="80">80 g</button>
+  </div>
+</div>
+
+<div class="card">
+  <div class="grid">
+    <button class="roxo" onclick="enviar({type:'refill'})">Reabastecer +1 kg</button>
+    <button class="laranja" onclick="enviar({type:'emptyBowl'})">Esvaziar pote</button>
+  </div>
+</div>
+
+<div class="card">
+  <div style="margin-bottom:6px">Registro de eventos</div>
+  <div class="log" id="log"></div>
+</div>
+
+<script>
+let state = { lock: true, auto: true, portion: 50, hopper: 0, bowl: 0, motor: false, logs: [] };
+let ws;
+
+function conectar() {
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onopen = () => setConexao(true);
+  ws.onclose = () => { setConexao(false); setTimeout(conectar, 1500); };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'state') { state = m.state; render(); }
+  };
+}
+
+function setConexao(ok) {
+  document.getElementById('conDot').className = 'dot ' + (ok ? 'on-dot' : 'off-dot');
+  document.getElementById('conTxt').textContent = ok ? 'Conectado ao SmartFeed' : 'Sem conexão';
+}
+
+function enviar(obj) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+}
+
+function servir(g) { enviar({ type: 'dispense', grams: g }); }
+
+function render() {
+  document.getElementById('hopperTxt').textContent = Math.round(state.hopper) + ' g';
+  document.getElementById('bowlTxt').textContent = Math.round(state.bowl) + ' g';
+  document.getElementById('motorTxt').textContent = state.motor ? '⚙️ Dispensando...' : 'Motor parado';
+
+  const bAuto = document.getElementById('btnAuto');
+  bAuto.textContent = state.auto ? 'Ligado' : 'Desligado';
+  bAuto.className = state.auto ? 'verde' : 'cinza';
+
+  const bLock = document.getElementById('btnLock');
+  bLock.textContent = state.lock ? '🔒 Travada' : '🔓 Destravada';
+  bLock.className = state.lock ? 'cinza' : 'laranja';
+
+  document.querySelectorAll('#porcoes button').forEach(b => {
+    b.classList.toggle('ativo', Number(b.dataset.g) === state.portion);
+  });
+
+  document.getElementById('log').innerHTML = state.logs.map(l => `<div>${l}</div>`).join('');
+}
+
+document.getElementById('btnAuto').onclick = () => enviar({ type: 'setAuto', value: !state.auto });
+document.getElementById('btnLock').onclick = () => enviar({ type: 'setLock', value: !state.lock });
+document.querySelectorAll('#porcoes button').forEach(b => {
+  b.onclick = () => enviar({ type: 'setPortion', grams: Number(b.dataset.g) });
+});
+
+conectar();
+</script>
+</body>
+</html>

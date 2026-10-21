@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>SmartFeed - Visualização interna</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; background: #0b1120; color: #e2e8f0;
+    font-family: system-ui, sans-serif; display: flex; overflow: hidden;
+  }
+  .palco { flex: 1.3; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  svg.cut { width: 100%; max-height: 100vh; }
+  .painel { flex: 1; padding: 30px 30px 30px 10px; display: flex; flex-direction: column; gap: 14px; }
+  h1 { margin: 0; font-size: 28px; }
+  .sub { color: #94a3b8; font-size: 14px; margin-bottom: 6px; }
+  .card { background: #111c33; border-radius: 14px; padding: 14px 18px; }
+  .label { font-size: 13px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; }
+  .valor { font-size: 26px; font-weight: 700; margin-top: 4px; }
+  .barra { height: 12px; background: #1e293b; border-radius: 6px; overflow: hidden; margin-top: 8px; }
+  .barra div { height: 100%; background: linear-gradient(90deg, #f59e0b, #d97706); transition: width .3s; }
+  .linha { display: flex; justify-content: space-between; align-items: center; }
+  .pill { padding: 4px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; }
+  .ok { background: #14532d; color: #86efac; }
+  .no { background: #450a0a; color: #fca5a5; }
+  .ativo { background: #1e3a8a; color: #93c5fd; }
+  .log { font-size: 13px; line-height: 1.7; color: #cbd5e1; }
+
+  /* Animação do motor */
+  .motor-girando { transform-origin: 440px 340px; }
+  .motor-girando.on { animation: gira 0.6s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+
+  /* Pisca da câmera */
+  .rec { fill: #ef4444; opacity: 0; }
+  .rec.on { animation: pisca 1.2s infinite; }
+  @keyframes pisca { 50% { opacity: 1; } }
+
+  /* Pulso do LED wi-fi */
+  .wifi-led { fill: #22c55e; filter: drop-shadow(0 0 4px #22c55e); }
+</style>
+</head>
+<body>
+
+<div class="palco">
+  <svg class="cut" viewBox="0 0 700 520">
+    <defs>
+      <pattern id="kibPat" width="16" height="16" patternUnits="userSpaceOnUse">
+        <circle cx="5" cy="5" r="5" fill="#d4913f"/>
+        <circle cx="12" cy="11" r="4.5" fill="#a86b2a"/>
+      </pattern>
+    </defs>
+
+    <!-- Tampa com trava -->
+    <rect x="290" y="14" width="160" height="16" rx="4" fill="#64748b"/>
+    <text x="370" y="12" font-size="12" fill="#94a3b8" text-anchor="middle" id="lockTxt">TAMPA TRAVADA</text>
+
+    <!-- Reservatório (transparente) -->
+    <path d="M230 40 Q230 28 245 28 L505 28 Q520 28 520 40 L520 150 L230 150 Z"
+          fill="#1e293b" opacity=".5" stroke="#64748b" stroke-width="3"/>
+    <!-- Ração dentro do reservatório (altura muda conforme o peso) -->
+    <rect id="kib" x="236" y="148" width="278" height="110" fill="url(#kibPat)"/>
+    <text id="kibTxt" x="375" y="90" font-size="18" fill="#fff" text-anchor="middle" font-weight="700"></text>
+
+    <!-- Corpo do aparelho -->
+    <rect x="230" y="150" width="290" height="260" rx="16" fill="#cfd8e3" stroke="#475569" stroke-width="3"/>
+    <rect x="250" y="168" width="200" height="50" rx="6" fill="#0f172a"/>
+    <text x="350" y="190" font-size="12" fill="#38bdf8" text-anchor="middle" font-family="monospace">APLICATIVO</text>
+    <text x="350" y="208" font-size="12" fill="#38bdf8" text-anchor="middle" font-family="monospace" id="ledTxt">CONECTADO</text>
+    <circle cx="478" cy="193" r="10" class="wifi-led"/>
+
+    <!-- Câmera Full HD -->
+    <circle cx="300" cy="280" r="24" fill="#1e293b" stroke="#334155" stroke-width="3"/>
+    <circle cx="300" cy="280" r="10" fill="#38bdf8"/>
+    <circle cx="326" cy="262" r="4" class="rec" id="recDot"/>
+
+    <!-- Compartimento do motor + dosador (cutaway escuro) -->
+    <rect x="300" y="310" width="210" height="80" rx="6" fill="#334155" stroke="#1e293b" stroke-width="2"/>
+    <!-- Rosca dosadora (auger) -->
+    <rect x="322" y="338" width="100" height="22" fill="#94a3b8"/>
+    <line x1="332" y1="338" x2="332" y2="360" stroke="#475569" stroke-width="3"/>
+    <line x1="350" y1="338" x2="350" y2="360" stroke="#475569" stroke-width="3"/>
+    <line x1="368" y1="338" x2="368" y2="360" stroke="#475569" stroke-width="3"/>
+    <line x1="386" y1="338" x2="386" y2="360" stroke="#475569" stroke-width="3"/>
+    <line x1="404" y1="338" x2="404" y2="360" stroke="#475569" stroke-width="3"/>
+    <!-- Motor -->
+    <g class="motor-girando" id="motorGroup">
+      <circle cx="440" cy="340" r="26" fill="#475569" stroke="#1e293b" stroke-width="3"/>
+      <line x1="440" y1="318" x2="440" y2="362" stroke="#cbd5e1" stroke-width="5"/>
+      <line x1="418" y1="340" x2="462" y2="340" stroke="#cbd5e1" stroke-width="5"/>
+    </g>
+    <text x="440" y="306" font-size="11" fill="#e2e8f0" text-anchor="middle">MOTOR</text>
+
+    <!-- Saída (dosador) -->
+    <rect x="296" y="372" width="28" height="22" fill="#1e293b"/>
+
+    <!-- Pote -->
+    <path d="M105 415 L115 470 Q200 495 285 470 L295 415 Z" fill="#e2e8f0" stroke="#64748b" stroke-width="3"/>
+    <ellipse cx="200" cy="415" rx="95" ry="26" fill="#f1f5f9" stroke="#64748b" stroke-width="3"/>
+    <ellipse id="food" cx="200" cy="412" rx="80" ry="8" fill="#b5773a"/>
+
+    <!-- Balança (célula de carga) -->
+    <rect x="130" y="478" width="140" height="18" rx="4" fill="#334155"/>
+    <text x="200" y="492" font-size="11" fill="#fff" text-anchor="middle">CÉLULA DE CARGA</text>
+    <text id="bowlTxt" x="200" y="512" font-size="16" fill="#fbbf24" text-anchor="middle" font-weight="700">0 g</text>
+
+    <!-- Partículas de ração caindo (criadas pelo JS) -->
+    <g id="particulas"></g>
+
+    <!-- Legendas -->
+    <g font-size="13" fill="#cbd5e1">
+      <text x="20" y="70">RAÇÃO SECA</text>
+      <line x1="120" y1="66" x2="228" y2="80" stroke="#64748b" stroke-width="1.5"/>
+      <text x="530" y="90">RESERVATÓRIO</text>
+      <line x1="528" y1="96" x2="520" y2="110" stroke="#64748b" stroke-width="1.5"/>
+      <text x="20" y="284">CÂMERA 1080p</text>
+      <line x1="130" y1="280" x2="276" y2="280" stroke="#64748b" stroke-width="1.5"/>
+      <text x="530" y="350">MOTOR + DOSADOR</text>
+      <line x1="528" y1="356" x2="512" y2="346" stroke="#64748b" stroke-width="1.5"/>
+      <text x="20" y="420">POTE REMOVÍVEL</text>
+      <line x1="135" y1="418" x2="110" y2="418" stroke="#64748b" stroke-width="1.5"/>
+    </g>
+  </svg>
+</div>
+
+<div class="painel">
+  <div>
+    <h1>SmartFeed</h1>
+    <div class="sub">Visualização do funcionamento interno</div>
+  </div>
+
+  <div class="card">
+    <div class="linha">
+      <div>
+        <div class="label">Motor</div>
+        <div class="valor" id="motorStatus">Parado</div>
+      </div>
+      <span class="pill ok" id="conPill">Conectado</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="label">Ração no reservatório</div>
+    <div class="valor" id="hopperVal">--</div>
+    <div class="barra"><div id="hopperBar" style="width:0%"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">No pote (balança)</div>
+    <div class="valor" id="bowlVal">--</div>
+  </div>
+
+  <div class="card">
+    <div class="linha">
+      <div><div class="label">Modo automático</div><div class="valor" style="font-size:18px" id="autoVal">--</div></div>
+      <div><div class="label">Tampa</div><div class="valor" style="font-size:18px" id="tampaVal">--</div></div>
+    </div>
+    <div class="label" style="margin-top:12px">Próxima refeição</div>
+    <div class="valor" style="font-size:20px" id="proxVal">--</div>
+  </div>
+
+  <div class="card">
+    <div class="label" style="margin-bottom:6px">Registro de eventos</div>
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const CAP_H = 110;
+let st = null;
+let ws;
+
+function conectar() {
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onopen = () => { $('conPill').textContent = 'Conectado'; $('conPill').className = 'pill ok'; };
+  ws.onclose = () => {
+    $('conPill').textContent = 'Sem conexão'; $('conPill').className = 'pill no';
+    setTimeout(conectar, 1500);
+  };
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if (m.type === 'state') { st = m.state; render(); }
+  };
+}
+
+function proximaRefeicao() {
+  const agora = new Date();
+  const minAgora = agora.getHours() * 60 + agora.getMinutes();
+  const hojes = st.meals.map(h => {
+    const [hh, mm] = h.split(':').map(Number);
+    return { txt: h, min: hh * 60 + mm };
+  }).sort((a, b) => a.min - b.min);
+  const prox = hojes.find(m => m.min > minAgora) || hojes[0];
+  return prox.txt + (hojes.find(m => m.min > minAgora) ? ' (hoje)' : ' (amanhã)');
+}
+
+function render() {
+  // Reservatório: altura da ração proporcional ao peso
+  const h = Math.max(0, st.hopper / st.capacity);
+  const H = CAP_H * h;
+  $('kib').setAttribute('y', 148 - H);
+  $('kib').setAttribute('height', H);
+  $('kibTxt').textContent = Math.round(st.hopper) + ' g';
+
+  // Pote: mais ração = monte maior
+  const mound = 4 + Math.min(st.bowl, 250) / 20;
+  $('food').setAttribute('ry', mound);
+  $('food').setAttribute('rx', 60 + Math.min(st.bowl, 250) / 6);
+  $('food').setAttribute('cy', 412 - mound * 0.3);
+  $('bowlTxt').textContent = Math.round(st.bowl) + ' g';
+
+  // Motor
+  $('motorGroup').classList.toggle('on', st.motor);
+  $('motorStatus').textContent = st.motor ? 'Dispensando' : 'Parado';
+  $('recDot').classList.add('on');
+
+  // Tampa e modo
+  $('lockTxt').textContent = st.lock ? 'TAMPA TRAVADA' : 'TAMPA DESTRAVADA';
+  $('tampaVal').textContent = st.lock ? '🔒 Travada' : '🔓 Aberta';
+  $('autoVal').textContent = st.auto ? 'Ligado' : 'Desligado';
+  $('ledTxt').textContent = 'CONECTADO';
+
+  // Painel lateral
+  $('hopperVal').textContent = Math.round(st.hopper) + ' / ' + st.capacity + ' g';
+  $('hopperBar').style.width = (h * 100) + '%';
+  $('bowlVal').textContent = Math.round(st.bowl) + ' g';
+  $('proxVal').textContent = proximaRefeicao();
+  $('log').innerHTML = st.logs.map(l => `<div>${l}</div>`).join('');
+}
+
+// Partículas de ração caindo do dosador até o pote
+function soltarParticula() {
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const c = document.createElementNS(svgNS, 'circle');
+  const cor = Math.random() > .5 ? '#d4913f' : '#a86b2a';
+  c.setAttribute('cx', 308); c.setAttribute('cy', 384); c.setAttribute('r', 4.5);
+  c.setAttribute('fill', cor);
+  $('particulas').appendChild(c);
+  const anim = c.animate([
+    { transform: 'translate(0px,0px)', opacity: 1 },
+    { transform: 'translate(-45px,18px)', opacity: 1, offset: 0.5 },
+    { transform: 'translate(-105px,38px)', opacity: 0 }
+  ], { duration: 650, easing: 'linear' });
+  anim.onfinish = () => c.remove();
+}
+
+setInterval(() => { if (st && st.motor) soltarParticula(); }, 140);
+
+conectar();
+</script>
+</body>
+</html>
