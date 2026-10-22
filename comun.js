@@ -7,19 +7,42 @@ const SMARTFEED = {
   topicoComando() { return this.sala + '/comando'; },
 
   conectar(aoConectar) {
+    const log = criarPainel();
+
     if (typeof mqtt === 'undefined') {
-      document.body.insertAdjacentHTML('afterbegin',
-        '<div style="background:#7f1d1d;color:#fff;padding:12px;font-family:system-ui">' +
-        'Não consegui carregar a biblioteca MQTT. Verifique a conexão com a internet ' +
-        'ou desative bloqueadores de conteúdo e recarregue a página.</div>');
+      log('ERRO: mqtt.min.js não carregou. Confira se o arquivo está na raiz do repositório.');
       return { connected: false, on() {}, subscribe() {}, publish() {} };
     }
+
+    log('Conectando em ' + this.broker + ' ...');
     const c = mqtt.connect(this.broker, {
       clientId: 'sf-' + Math.random().toString(16).slice(2, 10),
-      reconnectPeriod: 2000
+      reconnectPeriod: 2000,
+      connectTimeout: 10000
     });
-    c.on('connect', () => aoConectar(c));
-    c.on('error', e => console.error('Erro MQTT:', e));
+    c.on('connect', () => { log('MQTT conectado'); aoConectar(c); });
+    c.on('reconnect', () => log('Tentando reconectar...'));
+    c.on('offline', () => log('Offline: não consegui falar com o broker'));
+    c.on('error', e => log('Erro: ' + ((e && e.message) || e)));
+    c.on('close', () => log('Conexão fechada'));
     return c;
   }
 };
+
+// Painel de diagnóstico no rodapé da tela (para ver erros no celular)
+function criarPainel() {
+  let box = document.getElementById('sf-debug');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'sf-debug';
+    box.style.cssText =
+      'position:fixed;left:0;right:0;bottom:0;max-height:35%;overflow:auto;' +
+      'background:rgba(0,0,0,.85);color:#4ade80;font:12px monospace;padding:8px;z-index:99;';
+    document.body.appendChild(box);
+  }
+  return msg => {
+    const linha = document.createElement('div');
+    linha.textContent = new Date().toLocaleTimeString('pt-BR') + '  ' + msg;
+    box.appendChild(linha);
+  };
+}
