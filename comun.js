@@ -1,7 +1,7 @@
 const SMARTFEED = {
   // Use o MESMO nome nos dois aparelhos (TV e celular)
   sala: 'alimentapet-7h3k9qwz2m',
-  broker: 'wss://broker.hivemq.com:8884/mqtt',
+  broker: 'wss://test.mosquitto.org:8081',
 
   topicoEstado() { return this.sala + '/estado'; },
   topicoComando() { return this.sala + '/comando'; },
